@@ -50,6 +50,9 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
         x = np.dot(np.linalg.pinv(A), b)
         print x
 
+def show_transformed_kp(img1,img2,kp1,kp1transformed):
+    vis = np.concatenate((img1, img2), axis=1)
+    cv2.imshow("combined", vis)
 
 def perform_lo_ransac(matches):
     pass
