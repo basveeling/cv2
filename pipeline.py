@@ -33,10 +33,12 @@ def get_coordinates(match, keypoints1, keypoints2):
 
 
 def perform_ransac(matches, kp1, kp2, n_iterations):
+    best_n_inliers = 0
+    best_h = None
     for i in range(0, n_iterations):
         # Take random subset P from matches
         np.random.shuffle(matches)
-        P = matches[:5]  # 5 matches?
+        P = matches[:4]  # 5 matches?
         A = np.zeros((0, 8))
         b = np.zeros((0, 1))
         for match in P:
@@ -56,7 +58,26 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
         kp2_est = np.dot(h, kp1_matrix)
         kp2_est = kp2_est[:, :] / kp2_est[2, :]
 
+        n_inliers = 0
+        for match in matches:
+            kp1_id = match.queryIdx
+            kp2_id = match.trainIdx
+            if kp2_matrix[0, kp2_id] - 10 <= kp2_est[0, kp1_id] <= kp2_matrix[0, kp2_id] + 10 and kp2_matrix[
+                1, kp2_id] - 10 <= kp2_est[1, kp1_id] <= kp2_matrix[1, kp2_id] + 10:
+                n_inliers += 1
+            else:
+                pass
+
+        # print n_inliers, kp1_matrix.shape, kp2_matrix.shape
+        # print ".",
+        if best_n_inliers < n_inliers:
+            best_n_inliers = n_inliers
+            best_h = h
+
         pass
+    # print "\n", best_n_inliers
+    return best_h
+
 
 def perform_lo_ransac(matches):
     pass
@@ -82,7 +103,7 @@ def main():
     matches = find_matches(kp1, des1, kp2, des2)
 
     # Perform RANSAC
-    homography = perform_ransac(matches, kp1, kp2, 1)
+    homography = perform_ransac(matches, kp1, kp2, 1000)
 
     # Calculate size of new image
     new_size = estimate_new_size(img1, img2, homography)
