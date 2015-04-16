@@ -25,18 +25,29 @@ def find_matches(kp1,des1,kp2,des2):
     matches = bfm.match(des1,des2)
     return matches
 
+
 def get_coordinates(match, keypoints1, keypoints2):
-    pass
+    x1,y1 = keypoints1[match.queryIdx].pt
+    x2,y2 = keypoints2[match.trainIdx].pt
+    return x1,y1,x2,y2
 
 def perform_ransac(matches, kp1,kp2, n_iterations):
     for i in range(0,n_iterations):
         # Take random subset P from matches
         np.random.shuffle(matches)
         P = matches[:5] # 5 matches?
+        A = np.array([])
+        b = np.array([])
         for match in P:
             x1,y1,x2,y2 = get_coordinates(match, kp1,kp2)
-            A = np.array([[x1,y1,1,0,0,0, -x2*x1, -x2*y1],[0,0,0,x1,y1,1,-y2*x1,-y2*y1]])
-            b = np.array([x2,y2]).T
+            A = np.vstack((A,np.array([x1,y1,1,0,0,0, -x2*x1, -x2*y1])))
+            A = np.vstack((A,np.array([0,0,0,x1,y1,1,-y2*x1,-y2*y1])))    
+            b = np.vstack((b,np.array([x2])))
+            b = np.vstack((b,np.array([y2])))
+        print A
+        print b
+        x = np.dot(np.linalg.pinv(A),b)
+        print x
 
 
 def perform_lo_ransac(matches):
@@ -56,12 +67,11 @@ def main():
     # Detect feature points and compute descriptors
     kp1, des1 = detect_feature_points(img1)
     kp2, des2 = detect_feature_points(img2)
-    
     # Find matches between descriptors of img1 and img2
     matches = find_matches(kp1,des1,kp2,des2)
     
     # Perform RANSAC
-    homography = perform_ransac(matches,1)
+    homography = perform_ransac(matches,kp1,kp2,1)
     
     # Calculate size of new image
     new_size = estimate_new_size(img1,img2,homography)
