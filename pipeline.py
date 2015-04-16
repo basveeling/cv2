@@ -51,9 +51,12 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
         h = np.reshape(x, (3, 3))  # reshape to 3 by 3 matrix
 
         # Check inliers
-        kp1_matrix = np.array([[p.pt[0], p.pt[1]] for p in kp1])
-        kp2_matrix = np.array([[p.pt[0], p.pt[1]] for p in kp2])
-        
+        kp1_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp1]).T
+        kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
+        kp2_est = np.dot(h, kp1_matrix)
+        kp2_est = kp2_est[:, :] / kp2_est[2, :]
+
+        pass
 
 def perform_lo_ransac(matches):
     pass
