@@ -10,8 +10,8 @@ def detect_feature_points(img):
 
     # Show feature points (optional)
     imgkp = cv2.drawKeypoints(img, kp)
-    cv2.imshow('img with keypoints', imgkp)
-    cv2.waitKey(5000)
+    # cv2.imshow('img with keypoints', imgkp)
+    # cv2.waitKey(5000)
 
     # Return keypoints and descriptors
     return kp, des
@@ -38,18 +38,22 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
         np.random.shuffle(matches)
         P = matches[:5]  # 5 matches?
         A = np.zeros((0, 8))
-        b = np.zeros((0, 1  ))
+        b = np.zeros((0, 1))
         for match in P:
             x1, y1, x2, y2 = get_coordinates(match, kp1, kp2)
             A = np.vstack((A, np.array([x1, y1, 1, 0, 0, 0, -x2 * x1, -x2 * y1])))
             A = np.vstack((A, np.array([0, 0, 0, x1, y1, 1, -y2 * x1, -y2 * y1])))
-            b = np.vstack((b, np.array([x2])))
-            b = np.vstack((b, np.array([y2])))
-        print A
-        print b
-        x = np.dot(np.linalg.pinv(A), b)
-        print x
+            b = np.append(b, x2)
+            b = np.append(b, y2)
 
+        x = np.dot(np.linalg.pinv(A), b)
+        x = np.concatenate((x, [1]), axis=0)  # Add 1 to x
+        h = np.reshape(x, (3, 3))  # reshape to 3 by 3 matrix
+
+        # Check inliers
+        kp1_matrix = np.array([[p.pt[0], p.pt[1]] for p in kp1])
+        kp2_matrix = np.array([[p.pt[0], p.pt[1]] for p in kp2])
+        
 
 def perform_lo_ransac(matches):
     pass
