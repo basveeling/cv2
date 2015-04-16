@@ -51,7 +51,7 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
         x = np.dot(np.linalg.pinv(A), b)
         x = np.concatenate((x, [1]), axis=0)  # Add 1 to x
         h = np.reshape(x, (3, 3))  # reshape to 3 by 3 matrix
-
+	
         # Check inliers
         kp1_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp1]).T
         kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
@@ -78,6 +78,28 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
     # print "\n", best_n_inliers
     return best_h
 
+        
+
+def show_transformed_kp(img1,img2,kp1,h):
+    # Transform keypoints from img1 using homography h
+    kp1_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp1]).T
+    #kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
+    kp2_est = np.dot(h, kp1_matrix)
+    kp2_est = kp2_est[:, :] / kp2_est[2, :]
+    print np.shape(img1)
+    print np.shape(img2)
+    h1 = img1.shape[0]
+    h2 = img2.shape[0]
+    w1 = img1.shape[1]
+    w2 = img2.shape[1]
+    vis = np.zeros((max(h1, h2), w1+w2), np.uint8)
+    print np.shape(vis)
+    vis[:h1, :w1] = img1
+    vis[:h2, w1:w1+w2] = img2
+    plot_image = cv2.imshow("combined", vis)
+    
+    
+    cv2.waitKey(10000)
 
 def perform_lo_ransac(matches):
     pass
@@ -103,8 +125,10 @@ def main():
     matches = find_matches(kp1, des1, kp2, des2)
 
     # Perform RANSAC
-    homography = perform_ransac(matches, kp1, kp2, 1000)
-
+    homography = perform_ransac(matches, kp1, kp2, 1)
+    
+    # Show transformed keypoints
+    show_transformed_kp(img1,img2,kp1,homography)
     # Calculate size of new image
     new_size = estimate_new_size(img1, img2, homography)
 
