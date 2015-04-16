@@ -10,8 +10,8 @@ def detect_feature_points(img):
 
     # Show feature points (optional)
     imgkp = cv2.drawKeypoints(img, kp)
-    cv2.imshow('img with keypoints', imgkp)
-    cv2.waitKey(5000)
+    # cv2.imshow('img with keypoints', imgkp)
+    # cv2.waitKey(5000)
 
     # Return keypoints and descriptors
     return kp, des
@@ -38,21 +38,47 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
         np.random.shuffle(matches)
         P = matches[:5]  # 5 matches?
         A = np.zeros((0, 8))
-        b = np.zeros((0, 1  ))
+        b = np.zeros((0, 1))
         for match in P:
             x1, y1, x2, y2 = get_coordinates(match, kp1, kp2)
             A = np.vstack((A, np.array([x1, y1, 1, 0, 0, 0, -x2 * x1, -x2 * y1])))
             A = np.vstack((A, np.array([0, 0, 0, x1, y1, 1, -y2 * x1, -y2 * y1])))
-            b = np.vstack((b, np.array([x2])))
-            b = np.vstack((b, np.array([y2])))
-        print A
-        print b
-        x = np.dot(np.linalg.pinv(A), b)
-        print x
+            b = np.append(b, x2)
+            b = np.append(b, y2)
 
-def show_transformed_kp(img1,img2,kp1,kp1transformed):
-    vis = np.concatenate((img1, img2), axis=1)
-    cv2.imshow("combined", vis)
+        x = np.dot(np.linalg.pinv(A), b)
+        x = np.concatenate((x, [1]), axis=0)  # Add 1 to x
+        h = np.reshape(x, (3, 3))  # reshape to 3 by 3 matrix
+	
+        # Check inliers
+        kp1_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp1]).T
+        kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
+        kp2_est = np.dot(h, kp1_matrix)
+        kp2_est = kp2_est[:, :] / kp2_est[2, :]
+        
+
+def show_transformed_kp(img1,img2,kp1,h):
+    # Transform keypoints from img1 using homography h
+    kp1_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp1]).T
+    #kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
+    kp2_est = np.dot(h, kp1_matrix)
+    kp2_est = kp2_est[:, :] / kp2_est[2, :]
+    print np.shape(img1)
+    print np.shape(img2)
+    h1 = img1.shape[0]
+    h2 = img2.shape[0]
+    w1 = img1.shape[1]
+    w2 = img2.shape[1]
+    vis = np.zeros((max(h1, h2), w1+w2), np.uint8)
+    print np.shape(vis)
+    vis[:h1, :w1] = img1
+    vis[:h2, w1:w1+w2] = img2
+    plot_image = cv2.imshow("combined", vis)
+    
+    
+    cv2.waitKey(10000)
+    
+    
 
 def perform_lo_ransac(matches):
     pass
@@ -79,7 +105,10 @@ def main():
 
     # Perform RANSAC
     homography = perform_ransac(matches, kp1, kp2, 1)
-
+    
+    # Show transformed keypoints
+    show_transformed_kp(img1,img2,kp1,homography)
+    
     # Calculate size of new image
     new_size = estimate_new_size(img1, img2, homography)
 
