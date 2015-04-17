@@ -86,16 +86,26 @@ def show_transformed_kp(img1,img2,kp1,h):
     #kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
     kp2_est = np.dot(h, kp1_matrix)
     kp2_est = kp2_est[:, :] / kp2_est[2, :]
-    print np.shape(img1)
-    print np.shape(img2)
     h1 = img1.shape[0]
     h2 = img2.shape[0]
     w1 = img1.shape[1]
     w2 = img2.shape[1]
     vis = np.zeros((max(h1, h2), w1+w2), np.uint8)
-    print np.shape(vis)
     vis[:h1, :w1] = img1
     vis[:h2, w1:w1+w2] = img2
+    #print kp2_est
+    for k in range(0,len(kp1)):
+        # Plot img1 keypoints
+        kpx = int(kp1[k].pt[0])
+        kpy = int(kp1[k].pt[1])
+        cv2.circle(vis,(kpx,kpy),1,(255,0,0))
+        
+        # Plot estimated img2 keypoints
+        estx = int(kp2_est[0,k]) + w1
+        esty = int(kp2_est[1,k])
+        #print kp2_est[:2,k]
+        cv2.circle(vis,(estx,esty),1,(255,0,0))
+    print np.shape(vis)
     plot_image = cv2.imshow("combined", vis)
     
     
@@ -115,9 +125,11 @@ def stitch(img1, img2, homography, new_size):
 
 def main():
     # Load images
-    img1 = cv2.imread("bus/bus_left.jpg", cv2.IMREAD_GRAYSCALE)
-    img2 = cv2.imread("bus/bus_right.jpg", cv2.IMREAD_GRAYSCALE)
-
+    img1 = cv2.imread("bus/bus_left.jpg")
+    img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    img2 = cv2.imread("bus/bus_right.jpg")
+    img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+    
     # Detect feature points and compute descriptors
     kp1, des1 = detect_feature_points(img1)
     kp2, des2 = detect_feature_points(img2)
