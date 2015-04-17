@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+from skimage import data
+from skimage import transform as tf
 
 # Nice tutorial: https://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_tutorials.html
 
@@ -10,7 +12,7 @@ def detect_feature_points(img):
 
     # Show feature points (optional)
     imgkp = cv2.drawKeypoints(img, kp)
-    # cv2.imshow('img with keypoints', imgkp)
+    cv2.imshow('img with keypoints', imgkp)
     # cv2.waitKey(5000)
 
     # Return keypoints and descriptors
@@ -109,17 +111,25 @@ def show_transformed_kp(img1,img2,kp1,h):
     plot_image = cv2.imshow("combined", vis)
     
     
-    cv2.waitKey(10000)
+    # cv2.waitKey(10000)
 
 def perform_lo_ransac(matches):
     pass
 
 
 def estimate_new_size(img1, img2, homography):
+
     pass
 
 
-def stitch(img1, img2, homography, new_size):
+def stitch(img1, img2, h, new_size):
+    r1,c1 = img1.shape
+    r2,c2 = img2.shape
+
+    dst = cv2.warpPerspective(img2,h,(c2,r2))
+    # TODO: h wordt nog niet goed berekend
+    plot_image = cv2.imshow("combined2", dst)
+    cv2.waitKey(2000)
     pass
 
 
