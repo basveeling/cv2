@@ -107,11 +107,12 @@ def show_transformed_kp(img1,img2,kp1,h):
         esty = int(kp2_est[1,k])
         #print kp2_est[:2,k]
         cv2.circle(vis,(estx,esty),1,(255,0,0))
+        #cv2.line(vis,(kpx,kpy),(estx,esty),(255,0,0))
     print np.shape(vis)
     plot_image = cv2.imshow("combined", vis)
     
     
-    # cv2.waitKey(10000)
+    cv2.waitKey(-1)
 
 def perform_lo_ransac(matches):
     pass
