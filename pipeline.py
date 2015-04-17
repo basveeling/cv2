@@ -53,7 +53,7 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
         x = np.dot(np.linalg.pinv(A), b)
         x = np.concatenate((x, [1]), axis=0)  # Add 1 to x
         h = np.reshape(x, (3, 3))  # reshape to 3 by 3 matrix
-	
+
         # Check inliers
         kp1_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp1]).T
         kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
@@ -80,7 +80,7 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
     # print "\n", best_n_inliers
     return best_h
 
-        
+
 
 def show_transformed_kp(img1,img2,kp1,h):
     # Transform keypoints from img1 using homography h
@@ -101,7 +101,7 @@ def show_transformed_kp(img1,img2,kp1,h):
         kpx = int(kp1[k].pt[0])
         kpy = int(kp1[k].pt[1])
         cv2.circle(vis,(kpx,kpy),1,(255,0,0))
-        
+
         # Plot estimated img2 keypoints
         estx = int(kp2_est[0,k]) + w1
         esty = int(kp2_est[1,k])
@@ -110,27 +110,47 @@ def show_transformed_kp(img1,img2,kp1,h):
         cv2.line(vis,(kpx,kpy),(estx,esty),(255,0,0))
     print np.shape(vis)
     plot_image = cv2.imshow("combined", vis)
-    
-    
-    cv2.waitKey(-1)
+
+
+    cv2.waitKey(3000)
 
 def perform_lo_ransac(matches):
     pass
 
 
-def estimate_new_size(img1, img2, homography):
+def estimate_new_size(img1, img2, h):
+    r1, c1 = img1.shape
+    r2, c2 = img2.shape
+    new_points = np.dot(h,np.double(np.array([[0, 0, r2, r2],[0, c2, 0, c2], [1,1,1,1]])))
+    new_points = new_points[:, :] / new_points[2, :]
+    print new_points
+    new_width = int(np.ceil(np.max(new_points[0,:]) - np.min(new_points[0,:])))
+    new_height = int(np.ceil(np.max(new_points[1,:]) - np.min(new_points[1,:])))
+    offset_x = int(np.min(new_points[0,:]))
+    offset_y = int(np.min(new_points[1,:]))
+    print r2, c2, new_height, new_width
+    return (new_height, new_width), (offset_x, offset_y)
 
-    pass
 
+def stitch(img1, img2, h, new_size, offset):
+    new_height, new_width = new_size
+    r1, c1 = img1.shape
 
-def stitch(img1, img2, h, new_size):
-    r1,c1 = img1.shape
-    r2,c2 = img2.shape
+    comb_height = max(r1, new_height) + np.abs(offset[1])
+    comb_width  = max(c1, new_width ) + np.abs(offset[0])
+    print comb_height, comb_width, offset
+    print r1,c1
+    new_img = np.zeros((comb_height , comb_width),dtype=np.uint8)
 
-    dst = cv2.warpPerspective(img2,h,(c2,r2))
+    dst = cv2.warpPerspective(img1, h, (new_width, new_height))
+
+    new_img[0:r1,0:c1] = img1[:,:]
+    print offset[1],new_height+offset[1],offset[0],new_width+offset[0]
+    # TODO: Hier gaat nog steeds wat mis, ik bereken de new image size & offset van de left image nog niet goed.
+    # new_img[r1+offset[1]:new_height+offset[1],offset[0]:new_width+offset[0]] = dst
     # TODO: h wordt nog niet goed berekend
-    plot_image = cv2.imshow("combined2", dst)
-    cv2.waitKey(2000)
+    plot_image = cv2.imshow("combined2", new_img)
+    cv2.waitKey(5000)
     pass
 
 
@@ -140,7 +160,7 @@ def main():
     img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     img2 = cv2.imread("bus/bus_right.jpg")
     img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-    
+
     # Detect feature points and compute descriptors
     kp1, des1 = detect_feature_points(img1)
     kp2, des2 = detect_feature_points(img2)
@@ -149,14 +169,14 @@ def main():
 
     # Perform RANSAC
     homography = perform_ransac(matches, kp1, kp2, 1000)
-    
+
     # Show transformed keypoints
     show_transformed_kp(img1,img2,kp1,homography)
     # Calculate size of new image
-    new_size = estimate_new_size(img1, img2, homography)
+    new_size, offset = estimate_new_size(img1, img2, homography)
 
     # Stitch images together
-    stitch(img1, img2, homography, new_size)
+    stitch(img1, img2, homography, new_size, offset)
 
 
 if __name__ == "__main__":
