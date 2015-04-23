@@ -77,7 +77,7 @@ def perform_ransac(matches, kp1, kp2, n_iterations):
             best_h = h
 
         pass
-    # print "\n", best_n_inliers
+    print "\n", best_n_inliers
     return best_h
 
 
@@ -112,7 +112,7 @@ def show_transformed_kp(img1,img2,kp1,h):
     plot_image = cv2.imshow("combined", vis)
 
 
-    cv2.waitKey(3000)
+    # cv2.waitKey(3000)
 
 def perform_lo_ransac(matches):
     pass
@@ -121,7 +121,7 @@ def perform_lo_ransac(matches):
 def estimate_new_size(img1, img2, h):
     r1, c1 = img1.shape
     r2, c2 = img2.shape
-    new_points = np.dot(h,np.double(np.array([[0, 0, r2, r2],[0, c2, 0, c2], [1,1,1,1]])))
+    new_points = np.dot(h,np.double(np.array([[0, 0, c2, c2],[0, r2, 0, r2], [1,1,1,1]])))
     new_points = new_points[:, :] / new_points[2, :]
     print new_points
     new_width = int(np.ceil(np.max(new_points[0,:]) - np.min(new_points[0,:])))
@@ -134,23 +134,28 @@ def estimate_new_size(img1, img2, h):
 
 def stitch(img1, img2, h, new_size, offset):
     new_height, new_width = new_size
+    x_offset, y_offset = offset
     r1, c1 = img1.shape
 
-    comb_height = max(r1, new_height) + np.abs(offset[1])
-    comb_width  = max(c1, new_width ) + np.abs(offset[0])
+    comb_height = max(r1, new_height) #+y_offset #+ np.abs(y_offset)
+    comb_width  = c1 + new_width - (c1+int(np.ceil(h[0,2]))) #+ np.abs(x_offset)
     print comb_height, comb_width, offset
     print r1,c1
     new_img = np.zeros((comb_height , comb_width),dtype=np.uint8)
 
-    dst = cv2.warpPerspective(img1, h, (new_width, new_height))
 
-    new_img[0:r1,0:c1] = img1[:,:]
+    new_img = cv2.warpPerspective(img2, h, (comb_width, comb_height),flags=cv2.WARP_INVERSE_MAP+cv2.INTER_NEAREST)
+
+
+    # plot_image = cv2.imshow("warped", new_img)
+    # cv2.waitKey(2000)
+    new_img[0:0+r1,0:0+c1] = img1[:,:]
     print offset[1],new_height+offset[1],offset[0],new_width+offset[0]
     # TODO: Hier gaat nog steeds wat mis, ik bereken de new image size & offset van de left image nog niet goed.
     # new_img[r1+offset[1]:new_height+offset[1],offset[0]:new_width+offset[0]] = dst
     # TODO: h wordt nog niet goed berekend
     plot_image = cv2.imshow("combined2", new_img)
-    cv2.waitKey(5000)
+    cv2.waitKey(0)
     pass
 
 
@@ -168,7 +173,7 @@ def main():
     matches = find_matches(kp1, des1, kp2, des2)
 
     # Perform RANSAC
-    homography = perform_ransac(matches, kp1, kp2, 1000)
+    homography = perform_ransac(matches, kp1, kp2, 2000)
 
     # Show transformed keypoints
     show_transformed_kp(img1,img2,kp1,homography)
