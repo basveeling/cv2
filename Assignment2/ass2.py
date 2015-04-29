@@ -119,6 +119,32 @@ class PointChaining(object):
 
         F = np.dot(np.dot(T2.T, norm_F), T1)
         return F, dmatches, matches
+    
+    def compute_fund_matr_ransac(self, kp1, kp2, des1, des2, n_iterations=100):
+        #dmatches = self.dmatches_for_images(kp1, kp2, des1, des2)
+        #matches = self.make_match_matrix(dmatches, kp1, kp2)
+
+        #norm_coords1, T1 = pc.normalize_coords(matches, 0)
+        #norm_coords2, T2 = pc.normalize_coords(matches, 1)
+        #norm_matches = (norm_coords1, norm_coords2)
+        
+        #best_inliers = []
+        #for i in range(0,n_iterations):
+            #cur_inliers = []
+            #norm_F = self.estimate_fundamental_matrix(norm_matches, kp1, kp2)
+            #F = np.dot(np.dot(T2.T, norm_F), T1)
+            #for match in dmatches:
+                ##dist = compute sampson distance
+                
+                #if (dist < INLIER_THRESHOLD):
+                    #cur_inliers.append(match)
+            #if len(cur_inliers) >= len(best_inliers):
+                #best_inliers = cur_inliers
+                
+        ## compute F_best based on set of best inliers
+        
+        #return F_best, dmatches, matches
+        pass
 
     def show_matches(self, agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2):
         kp1_agree = [kp1[i] for i in kp1_agree_ind]
