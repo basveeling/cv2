@@ -21,7 +21,7 @@ def sampson_distance(F, h1, h2, i):
 
 class PointChaining(object):
     def __init__(self, n_iterations, images):
-        self.match_dist_threshold = 100  # TODO: find a correct value for this
+        self.match_dist_threshold = 100 # TODO: find a correct value for this
         self.images = images
         self.n_iterations = n_iterations
 
@@ -94,9 +94,7 @@ class PointChaining(object):
     def add_homogenous(self, coords):
         return np.concatenate((coords, np.ones((coords.shape[0], 1))), axis=1)
 
-    def normalize_coords(self, matches, index=0):
-        off = index * 2
-        coords = matches[index]
+    def normalize_coords(self, coords):
         homo_coords = self.add_homogenous(coords)
 
         mean_x, mean_y = list(np.mean(coords, axis=0))
@@ -116,8 +114,8 @@ class PointChaining(object):
         dmatches = self.dmatches_for_images(kp1, kp2, des1, des2)
         matches = self.make_match_matrix(dmatches, kp1, kp2)
 
-        norm_coords1, T1 = pc.normalize_coords(matches, 0)
-        norm_coords2, T2 = pc.normalize_coords(matches, 1)
+        norm_coords1, T1 = pc.normalize_coords(matches[0])
+        norm_coords2, T2 = pc.normalize_coords(matches[1])
         norm_matches = (norm_coords1, norm_coords2)
 
         norm_F = self.estimate_fundamental_matrix(norm_matches,use_all=False)
@@ -125,46 +123,43 @@ class PointChaining(object):
         F = np.dot(np.dot(T2.T, norm_F), T1)
         return F, dmatches, matches
     
-    def compute_fund_matr_ransac(self, kp1, kp2, des1, des2, n_iterations=100):
+    def compute_fund_matr_ransac(self, kp1, kp2, des1, des2):
         dmatches = self.dmatches_for_images(kp1, kp2, des1, des2)
         matches = self.make_match_matrix(dmatches, kp1, kp2)
 
-        norm_coords1, T1 = pc.normalize_coords(matches, 0)
-        norm_coords2, T2 = pc.normalize_coords(matches, 1)
+        norm_coords1, T1 = pc.normalize_coords(matches[0])
+        norm_coords2, T2 = pc.normalize_coords(matches[1])
         norm_matches = (norm_coords1, norm_coords2)
         
-        best_inliers1 = []
-        best_inliers2 = []
-        
+        best_inlier_indexes = []
+        best_inlier_F = None
         homo_coords1, homo_coords2 = self.add_homogenous(matches[0]), self.add_homogenous(matches[1])
         n_matches = homo_coords1.shape[0]
         
-        for i in range(0,n_iterations):
-            cur_inliers1 = []
-            cur_inliers2 = []
-            norm_F = self.estimate_fundamental_matrix(norm_matches, kp1, kp2)
+        for i in range(self.n_iterations):
+            cur_inlier_indexes = []
+            norm_F = self.estimate_fundamental_matrix(norm_matches)
             F = np.dot(np.dot(T2.T, norm_F), T1)
             for m in range(n_matches):
                 distance = sampson_distance(F, homo_coords1, homo_coords2, m)
                 
                 if np.abs(distance) < self.match_dist_threshold:
-                    cur_inliers1.append(homo_coords1[m])
-                    cur_inliers2.append(homo_coords2[m])
-            if len(cur_inliers1) >= len(best_inliers1):
-                best_inliers1 = cur_inliers1
-                best_inliers2 = cur_inliers2
-        
-        ##### TODO
-        
-        norm_coords1, T1 = pc.normalize_coords(matches, 0)
-        norm_coords2, T2 = pc.normalize_coords(matches, 1)
-        norm_matches = (norm_coords1, norm_coords2)
-        best_matches = 
+                    cur_inlier_indexes.append(m)
+
+            if len(cur_inlier_indexes) >= len(best_inlier_indexes):
+                best_inlier_indexes = cur_inlier_indexes
+                best_inlier_F = F
+
+
+
+        print "Num inliers:", len(best_inlier_indexes) / n_matches
+        best_norm_matches = (norm_coords1[best_inlier_indexes], norm_coords2[best_inlier_indexes])
+        # best_matches =
                 
-        # compute best_F based on set of best inliers
-        norm_best_F = self.estimate_fundamental_matrix(best_matches, use_all=True)
-        best_F = np.dot(np.dot(T2.T, norm_best_F), T1)
-        return best_F, dmatches, matches
+        # # compute best_F based on set of best inliers
+        # norm_best_F = self.estimate_fundamental_matrix(best_norm_matches, use_all=True)
+        # best_F = np.dot(np.dot(T2.T, norm_best_F), T1)
+        return best_inlier_F, dmatches, matches
 
     def show_matches(self, agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2):
         kp1_agree = [kp1[i] for i in kp1_agree_ind]
@@ -199,7 +194,8 @@ class PointChaining(object):
             img2 = self.images[ind2]
             kp2, des2 = self.detect_feature_points(img2)
             keypoints.append(keypoints)
-            F, dmatches, matches = self.compute_fund_matr(kp1, kp2, des1, des2)
+            # F, dmatches, matches = self.compute_fund_matr(kp1, kp2, des1, des2)
+            F, dmatches, matches = self.compute_fund_matr_ransac(kp1, kp2, des1, des2)
             agreeing_matches = self.find_agreeing_matches(matches, F)
             kp1_agree_ind = [dmatches[i].queryIdx for i in agreeing_matches]
             kp2_agree_ind = [dmatches[i].trainIdx for i in agreeing_matches]
@@ -228,7 +224,7 @@ class PointChaining(object):
             distance = sampson_distance(F, homo_coords1, homo_coords2, i)
 
             if np.abs(distance) < self.match_dist_threshold:
-                print distance, matches[0][i] - matches[0][i], matches[0][i] - matches[1][i]
+                # print distance, matches[0][i] - matches[0][i], matches[0][i] - matches[1][i]
                 agreeing_matches.append(i)
 
         return agreeing_matches
@@ -259,7 +255,7 @@ class PointChaining(object):
             cv2.line(vis, (kpx, kpy), (estx, esty), (255, 0, 0))
         print np.shape(vis)
         plot_image = cv2.imshow("combined", vis)
-        cv2.waitKey(0)
+        # cv2.waitKey(0)
 
 
 def read_image(path):
@@ -273,5 +269,5 @@ if __name__ == '__main__':
     img_dir = "House/"
     for file in os.listdir(img_dir):
         images.append(read_image(img_dir + file))
-    pc = PointChaining(100, images)
+    pc = PointChaining(200, images)
     pc.run_pipeline()
