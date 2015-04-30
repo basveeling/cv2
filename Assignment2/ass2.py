@@ -130,27 +130,38 @@ class PointChaining(object):
         norm_coords2, T2 = pc.normalize_coords(matches, 1)
         norm_matches = (norm_coords1, norm_coords2)
         
-        best_inliers = []
+        best_inliers1 = []
+        best_inliers2 = []
         
         homo_coords1, homo_coords2 = self.add_homogenous(matches[0]), self.add_homogenous(matches[1])
         n_matches = homo_coords1.shape[0]
         
         for i in range(0,n_iterations):
-            cur_inliers = []
+            cur_inliers1 = []
+            cur_inliers2 = []
             norm_F = self.estimate_fundamental_matrix(norm_matches, kp1, kp2)
             F = np.dot(np.dot(T2.T, norm_F), T1)
             for m in range(n_matches):
                 distance = sampson_distance(F, homo_coords1, homo_coords2, m)
                 
                 if np.abs(distance) < self.match_dist_threshold:
-                    cur_inliers.append(match)
-            if len(cur_inliers) >= len(best_inliers):
-                best_inliers = cur_inliers
-                
-        # compute F_best based on set of best inliers
-        best_F = self.estimate_fundamental_matrix(norm_matches, best_inliers[:,0], best_inliers[:,1])
+                    cur_inliers1.append(homo_coords1[m])
+                    cur_inliers2.append(homo_coords2[m])
+            if len(cur_inliers1) >= len(best_inliers1):
+                best_inliers1 = cur_inliers1
+                best_inliers2 = cur_inliers2
         
-        return F_best, dmatches, matches
+        ##### TODO
+        
+        norm_coords1, T1 = pc.normalize_coords(matches, 0)
+        norm_coords2, T2 = pc.normalize_coords(matches, 1)
+        norm_matches = (norm_coords1, norm_coords2)
+        best_matches = 
+                
+        # compute best_F based on set of best inliers
+        norm_best_F = self.estimate_fundamental_matrix(best_matches, use_all=True)
+        best_F = np.dot(np.dot(T2.T, norm_best_F), T1)
+        return best_F, dmatches, matches
 
     def show_matches(self, agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2):
         kp1_agree = [kp1[i] for i in kp1_agree_ind]
