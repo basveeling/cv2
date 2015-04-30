@@ -7,19 +7,21 @@ import numpy as np
 import cv2
 
 
-def sampson_distance(F, homo_coords1, homo_coords2, i):
+def sampson_distance(F, h1, h2, i):
     # TODO: verify that this is being computed correctly?
-    denominator = np.dot(np.dot(homo_coords1[i].T, F), homo_coords2[i]) 
-    squared1 = np.dot(F, homo_coords1[i]) ** 2
-    squared2 = np.dot(F.T, homo_coords2[i]) ** 2
-    divisor = squared1[0] + squared1[1] + squared2[0] + squared2[1]
+    p = h1[i]
+    p_ = h2[i]
+    denominator = np.dot(np.dot(p_.T, F), p)**2
+    squaredp = np.dot(F, p) ** 2
+    squaredp_ = np.dot(F.T, p_) ** 2
+    divisor = squaredp[0] + squaredp[1] + squaredp_[0] + squaredp_[1]
     distance = denominator / divisor
     return distance
 
 
 class PointChaining(object):
     def __init__(self, n_iterations, images):
-        self.match_dist_threshold = 5000  # TODO: find a correct value for this
+        self.match_dist_threshold = 100  # TODO: find a correct value for this
         self.images = images
         self.n_iterations = n_iterations
 
@@ -62,8 +64,8 @@ class PointChaining(object):
         n_matches = matches[0].shape[0]
         indexes = np.array(range(n_matches))
         np.random.shuffle(indexes)
-        indexes = indexes[:8]
-        A = np.zeros((8, 9))
+        #indexes = indexes[:80]
+        A = np.zeros((len(indexes), 9))
         for i, match_i in enumerate(indexes):
             x1, y1 = list(matches[0][match_i, :])
             x2, y2 = list(matches[1][match_i, :])
@@ -155,6 +157,20 @@ class PointChaining(object):
         kp2_agree = [kp2[dmatches[i].trainIdx] for i in agreeing_matches]
         self.show_transformed_kp(img1, img2, kp1_agree, kp2_agree)
 
+    def create_pointview_row(self, kp1_agree_ind, kp2_agree_ind, last_kp):
+        new_pointview_row = [None] * len(last_kp)
+        recognized_points = 0
+        for p1, p2 in zip(kp1_agree_ind, kp2_agree_ind):
+            if p1 in last_kp:
+                recognized_points += 1
+                new_pointview_row[last_kp.index(p1)] = p2
+            else:
+                last_kp.append(p1)
+                new_pointview_row.append(p2)
+
+        print "Recognized %s" % str(recognized_points / len(last_kp))
+        return new_pointview_row
+
     def run_pipeline(self):
         n = len(self.images)
 
@@ -176,28 +192,20 @@ class PointChaining(object):
 
             if len(pointview_mtr) > 0:
                 last_kp = pointview_mtr[-1]
-                new_pointview_row = [None] * len(pointview_mtr[-1])
-                recognized_points = 0
-                for p1, p2 in zip(kp1_agree_ind, kp2_agree_ind):
-                    if p1 in last_kp:
-                        recognized_points += 1
-                        new_pointview_row[last_kp.index(p1)] = p2
-                    else:
-                        last_kp.append(p1)
-                        new_pointview_row.append(p2)
+                new_pointview_row = self.create_pointview_row(kp1_agree_ind, kp2_agree_ind, last_kp)
                 pointview_mtr.append(new_pointview_row)
-                print "Recognized %s" % str(recognized_points / len(pointview_mtr[-2]))
                 # TODO: almost no points from previous batch are being recognized. Find bug.
             else:
                 pointview_mtr.append(kp1_agree_ind)
                 pointview_mtr.append(kp2_agree_ind)
 
-            # self.show_matches(agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2)
+            self.show_matches(agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2)
             print len(agreeing_matches) / len(dmatches)
             # Move buffer forward
             img1, kp1, des1 = img2, kp2, des2
             # TODO: met RANSAC berekenen.
         print "Done"
+
     def find_agreeing_matches(self, matches, F):
         homo_coords1, homo_coords2 = self.add_homogenous(matches[0]), self.add_homogenous(matches[1])
         n_matches = homo_coords1.shape[0]
@@ -206,7 +214,7 @@ class PointChaining(object):
             distance = sampson_distance(F, homo_coords1, homo_coords2, i)
 
             if np.abs(distance) < self.match_dist_threshold:
-                # print distance, matches[0][i] - matches[0][i], matches[0][i] - matches[1][i]
+                print distance, matches[0][i] - matches[0][i], matches[0][i] - matches[1][i]
                 agreeing_matches.append(i)
 
         return agreeing_matches
@@ -248,7 +256,7 @@ def read_image(path):
 
 if __name__ == '__main__':
     images = []
-    img_dir = "bearsmall/"
+    img_dir = "House/"
     for file in os.listdir(img_dir):
         images.append(read_image(img_dir + file))
     pc = PointChaining(100, images)
