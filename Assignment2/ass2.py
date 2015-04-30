@@ -9,7 +9,7 @@ import cv2
 
 def sampson_distance(F, homo_coords1, homo_coords2, i):
     # TODO: verify that this is being computed correctly?
-    denominator = np.dot(np.dot(homo_coords1[i].T, F), homo_coords2[i])
+    denominator = np.dot(np.dot(homo_coords1[i].T, F), homo_coords2[i]) 
     squared1 = np.dot(F, homo_coords1[i]) ** 2
     squared2 = np.dot(F.T, homo_coords2[i]) ** 2
     divisor = squared1[0] + squared1[1] + squared2[0] + squared2[1]
@@ -121,30 +121,34 @@ class PointChaining(object):
         return F, dmatches, matches
     
     def compute_fund_matr_ransac(self, kp1, kp2, des1, des2, n_iterations=100):
-        #dmatches = self.dmatches_for_images(kp1, kp2, des1, des2)
-        #matches = self.make_match_matrix(dmatches, kp1, kp2)
+        dmatches = self.dmatches_for_images(kp1, kp2, des1, des2)
+        matches = self.make_match_matrix(dmatches, kp1, kp2)
 
-        #norm_coords1, T1 = pc.normalize_coords(matches, 0)
-        #norm_coords2, T2 = pc.normalize_coords(matches, 1)
-        #norm_matches = (norm_coords1, norm_coords2)
+        norm_coords1, T1 = pc.normalize_coords(matches, 0)
+        norm_coords2, T2 = pc.normalize_coords(matches, 1)
+        norm_matches = (norm_coords1, norm_coords2)
         
-        #best_inliers = []
-        #for i in range(0,n_iterations):
-            #cur_inliers = []
-            #norm_F = self.estimate_fundamental_matrix(norm_matches, kp1, kp2)
-            #F = np.dot(np.dot(T2.T, norm_F), T1)
-            #for match in dmatches:
-                ##dist = compute sampson distance
-                
-                #if (dist < INLIER_THRESHOLD):
-                    #cur_inliers.append(match)
-            #if len(cur_inliers) >= len(best_inliers):
-                #best_inliers = cur_inliers
-                
-        ## compute F_best based on set of best inliers
+        best_inliers = []
         
-        #return F_best, dmatches, matches
-        pass
+        homo_coords1, homo_coords2 = self.add_homogenous(matches[0]), self.add_homogenous(matches[1])
+        n_matches = homo_coords1.shape[0]
+        
+        for i in range(0,n_iterations):
+            cur_inliers = []
+            norm_F = self.estimate_fundamental_matrix(norm_matches, kp1, kp2)
+            F = np.dot(np.dot(T2.T, norm_F), T1)
+            for m in range(n_matches):
+                distance = sampson_distance(F, homo_coords1, homo_coords2, m)
+                
+                if np.abs(distance) < self.match_dist_threshold:
+                    cur_inliers.append(match)
+            if len(cur_inliers) >= len(best_inliers):
+                best_inliers = cur_inliers
+                
+        # compute F_best based on set of best inliers
+        best_F = self.estimate_fundamental_matrix(norm_matches, best_inliers[:,0], best_inliers[:,1])
+        
+        return F_best, dmatches, matches
 
     def show_matches(self, agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2):
         kp1_agree = [kp1[i] for i in kp1_agree_ind]
