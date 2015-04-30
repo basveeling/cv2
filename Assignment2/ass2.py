@@ -59,12 +59,12 @@ class PointChaining(object):
         x2, y2 = keypoints2[match.trainIdx].pt
         return x1, y1, x2, y2
 
-    def estimate_fundamental_matrix(self, matches, kp1, kp2):
+    def estimate_fundamental_matrix(self, matches):
         # Take random subset P from matches
         n_matches = matches[0].shape[0]
         indexes = np.array(range(n_matches))
         np.random.shuffle(indexes)
-        #indexes = indexes[:80]
+        indexes = indexes[:8]
         A = np.zeros((len(indexes), 9))
         for i, match_i in enumerate(indexes):
             x1, y1 = list(matches[0][match_i, :])
@@ -117,7 +117,7 @@ class PointChaining(object):
         norm_coords2, T2 = pc.normalize_coords(matches, 1)
         norm_matches = (norm_coords1, norm_coords2)
 
-        norm_F = self.estimate_fundamental_matrix(norm_matches, kp1, kp2)
+        norm_F = self.estimate_fundamental_matrix(norm_matches)
 
         F = np.dot(np.dot(T2.T, norm_F), T1)
         return F, dmatches, matches
