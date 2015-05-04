@@ -5,7 +5,7 @@ import os
 __author__ = 'bas'
 import numpy as np
 import cv2
-
+import pickle
 
 def sampson_distance(F, h1, h2, i):
     # TODO: verify that this is being computed correctly?
@@ -214,7 +214,11 @@ class PointChaining(object):
             # Move buffer forward
             img1, kp1, des1 = img2, kp2, des2
             # TODO: met RANSAC berekenen.
+        print "Saving pointview matrix"
+        f = open("../pointview.m","wb")
+        pickle.dump(pointview_mtr,f)
         print "Done"
+        
 
     def find_agreeing_matches(self, matches, F):
         homo_coords1, homo_coords2 = self.add_homogenous(matches[0]), self.add_homogenous(matches[1])
