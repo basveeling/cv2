@@ -18,28 +18,50 @@ def normalize_point_coordinates(matrix):
     n_rows = np.shape(matrix)[0]
     normal_matrix = np.zeros(np.shape(matrix))
     for row in range(n_rows):
-        print np.sum(matrix[row])
         # Take mean of row
         mean = np.nanmean(matrix[row])
         normal_matrix[row] = matrix[row] - mean
     return normal_matrix
 
 def find_dense_block(matrix):
-    for c,column in enumerate(matrix.T):
-        filled_rows = 0
-        for r,val in enumerate(column):
-            if val > 0.0:
-                filled_rows += 1
-            else:
-                # When first 0 is encountered after non-0, break
-                if (filled_rows > 0):
-                    # But first check if there were enough filled rows
-                    if (filled_rows > 0):
-                        pass
+    #filled_rows = {}
+    #good_column = {}
+    #for c,column in enumerate(matrix.T):
+        #filled_rows[c] = []
+        #for r,val in enumerate(column):
+            #if val is not np.NAN:
+                #filled_rows[c].append(r)
+            #else:
+                ## When first 0 is encountered after non-0, break
+                #if (len(filled_rows) > 0):
+                    ## Check if there were enough filled rows to call this a dense block
+                    #if (len(filled_rows) > 6):
+                        #good_column[c] = True
+                    #else:
+                        #good_column[c] = False
+                    
+                    #break
+    
+    #for col in good_column:
+        #if good_column[col] == False:
+            #print col
+    n_matches = 5
+    print np.shape(matrix)
+    for r in range(np.shape(matrix)[0]-n_matches):
+        full_cols = []
+        best_full_cols = []
+        for c in range(np.shape(matrix[r:r+n_matches])[1]):
+            if np.all(matrix[r:r+n_matches,c]) is not np.NAN):
+                print matrix[r:r+n_matches,c]
+                full_cols.append(matrix[r:r+n_matches,c])
+        if len(full_cols) > len(best_full_cols):
+            best_full_cols = full_cols
+    
+        
 
 if __name__ == '__main__':
     matr = load_pointview_matrix("../pointview.m")
-    #print matr
     norm_matr = normalize_point_coordinates(matr)
+    find_dense_block(matr)
     #print norm_matr
     #print(np.sum(pointview_mtr[:],axis=1)[0])
