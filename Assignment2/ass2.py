@@ -21,7 +21,7 @@ def sampson_distance(F, h1, h2, i):
 
 class PointChaining(object):
     def __init__(self, n_iterations, images):
-        self.match_dist_threshold = 100 # TODO: find a correct value for this
+        self.match_dist_threshold = 1000 # TODO: find a correct value for this
         self.images = images
         self.n_iterations = n_iterations
 
@@ -122,7 +122,16 @@ class PointChaining(object):
 
         F = np.dot(np.dot(T2.T, norm_F), T1)
         return F, dmatches, matches
-    
+
+    def find_inliers(self, est_F, homo_coords1, homo_coords2, n_matches):
+        cur_inlier_indexes = []
+        for m in range(n_matches):
+            distance = sampson_distance(est_F, homo_coords1, homo_coords2, m)
+
+            if np.abs(distance) < self.match_dist_threshold:
+                cur_inlier_indexes.append(m)
+        return cur_inlier_indexes
+
     def compute_fund_matr_ransac(self, kp1, kp2, des1, des2):
         dmatches = self.dmatches_for_images(kp1, kp2, des1, des2)
         matches = self.make_match_matrix(dmatches, kp1, kp2)
@@ -132,34 +141,35 @@ class PointChaining(object):
         norm_matches = (norm_coords1, norm_coords2)
         
         best_inlier_indexes = []
-        best_inlier_F = None
+        best_local_inlier_indexes = []
+        best_local_F = None
         homo_coords1, homo_coords2 = self.add_homogenous(matches[0]), self.add_homogenous(matches[1])
         n_matches = homo_coords1.shape[0]
         
         for i in range(self.n_iterations):
-            cur_inlier_indexes = []
             norm_F = self.estimate_fundamental_matrix(norm_matches)
-            F = np.dot(np.dot(T2.T, norm_F), T1)
-            for m in range(n_matches):
-                distance = sampson_distance(F, homo_coords1, homo_coords2, m)
-                
-                if np.abs(distance) < self.match_dist_threshold:
-                    cur_inlier_indexes.append(m)
+            est_F = np.dot(np.dot(T2.T, norm_F), T1)
 
-            if len(cur_inlier_indexes) >= len(best_inlier_indexes):
+            cur_inlier_indexes = self.find_inliers(est_F, homo_coords1, homo_coords2, n_matches)
+
+            if len(cur_inlier_indexes) >= len(best_inlier_indexes) and len(cur_inlier_indexes) >= len(best_local_inlier_indexes):
                 best_inlier_indexes = cur_inlier_indexes
-                best_inlier_F = F
 
+                inlier_matches = (norm_coords1[best_inlier_indexes], norm_coords2[best_inlier_indexes])
+                norm_local_F = self.estimate_fundamental_matrix(inlier_matches, use_all=True)
+                local_F = np.dot(np.dot(T2.T, norm_local_F), T1)
 
+                local_inlier_indexes = self.find_inliers(local_F, homo_coords1, homo_coords2, n_matches)
 
-        print "Num inliers:", len(best_inlier_indexes) / n_matches
-        best_norm_matches = (norm_coords1[best_inlier_indexes], norm_coords2[best_inlier_indexes])
+                if len(local_inlier_indexes) >= len(best_local_inlier_indexes):
+                    best_local_F = local_F
+                    best_local_inlier_indexes = local_inlier_indexes
+
+        print "Num inliers:", len(best_local_inlier_indexes) / n_matches
         # best_matches =
                 
         # # compute best_F based on set of best inliers
-        # norm_best_F = self.estimate_fundamental_matrix(best_norm_matches, use_all=True)
-        # best_F = np.dot(np.dot(T2.T, norm_best_F), T1)
-        return best_inlier_F, dmatches, matches
+        return best_local_F, dmatches, matches
 
     def show_matches(self, agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2):
         kp1_agree = [kp1[i] for i in kp1_agree_ind]
@@ -193,7 +203,7 @@ class PointChaining(object):
             ind2 = (ind1 + 1) % n
             img2 = self.images[ind2]
             kp2, des2 = self.detect_feature_points(img2)
-            keypoints.append(keypoints)
+            keypoints.append(kp2)
             # F, dmatches, matches = self.compute_fund_matr(kp1, kp2, des1, des2)
             F, dmatches, matches = self.compute_fund_matr_ransac(kp1, kp2, des1, des2)
             agreeing_matches = self.find_agreeing_matches(matches, F)
@@ -209,7 +219,9 @@ class PointChaining(object):
                 pointview_mtr.append(kp1_agree_ind)
                 pointview_mtr.append(kp2_agree_ind)
 
-            self.show_matches(agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2)
+            # self.show_matches(agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2)
+            if ind1 > 2:
+                self.show_pointview_mtr(pointview_mtr,img1, img2, kp1, kp2)
             print len(agreeing_matches) / len(dmatches)
             # Move buffer forward
             img1, kp1, des1 = img2, kp2, des2
@@ -234,6 +246,7 @@ class PointChaining(object):
         return agreeing_matches
 
     def show_transformed_kp(self, img1, img2, kp1, kp2):
+        cv2.waitKey(1)
         # Transform keypoints from img1 using homography h
         kp1_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp1]).T
         kp2_matrix = np.array([[p.pt[0], p.pt[1], 1] for p in kp2]).T
@@ -259,7 +272,18 @@ class PointChaining(object):
             cv2.line(vis, (kpx, kpy), (estx, esty), (255, 0, 0))
         print np.shape(vis)
         plot_image = cv2.imshow("combined", vis)
-        # cv2.waitKey(0)
+        cv2.waitKey(0)
+
+    def show_pointview_mtr(self, pointview_mtr, img1, img2, kp1, kp2):
+        lists = pointview_mtr[-4:]
+        kp1_agree = []
+        kp2_agree = []
+        for i in range(len(lists[0])):
+            if lists[0][i] is not None and lists[1][i] is not None and lists[2][i] is not None and lists[3][i] is not None:
+                kp1_agree.append(kp1[lists[2][i]])
+                kp2_agree.append(kp2[lists[3][i]])
+        self.show_transformed_kp(img1, img2, kp1_agree, kp2_agree)
+        pass
 
 
 def read_image(path):
