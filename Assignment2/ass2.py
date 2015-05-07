@@ -226,6 +226,7 @@ class PointChaining(object):
             if len(pointview_mtr) > 0:
                 last_kp = pointview_mtr[-1]
                 new_pointview_row = self.create_pointview_row(kp1_agree_ind, kp2_agree_ind, last_kp)
+                print(len(new_pointview_row))
                 pointview_mtr.append(new_pointview_row)
                 max_row_length = max(max_row_length, len(new_pointview_row)) # Keep max row length
             else:
@@ -242,6 +243,7 @@ class PointChaining(object):
         pointview_2m = self.create_pointview_2m(keypoints, max_row_length, n, pointview_mtr)
 
         print "Saving pointview matrix"
+        print(np.shape(pointview_mtr))
         f = open("../pointview.m","wb")
         pickle.dump(pointview_2m,f)
         print "Done"
