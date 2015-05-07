@@ -190,8 +190,20 @@ class PointChaining(object):
         print "Recognized %s" % str(recognized_points / len(last_kp))
         return new_pointview_row
 
+    def create_pointview_2m(self, keypoints, max_row_length, n, pointview_mtr):
+        pointview_2m = np.empty((2 * n, max_row_length))
+        pointview_2m[:] = np.NAN
+        for i in range(n):
+            xpoints = [keypoints[i][id].pt[0] if id is not None else np.NAN for id in pointview_mtr[i]]
+            ypoints = [keypoints[i][id].pt[1] if id is not None else np.NAN for id in pointview_mtr[i]]
+            pointview_2m[2 * i, 0:len(pointview_mtr[i])] = xpoints
+            pointview_2m[2 * i + 1, 0:len(pointview_mtr[i])] = ypoints
+        return pointview_2m
+
     def run_pipeline(self):
         n = len(self.images)
+
+        max_row_length = 0
 
         # Start buffer
         img1 = self.images[0]
@@ -202,9 +214,10 @@ class PointChaining(object):
         for ind1 in range(n):
             ind2 = (ind1 + 1) % n
             img2 = self.images[ind2]
+
             kp2, des2 = self.detect_feature_points(img2)
             keypoints.append(kp2)
-            # F, dmatches, matches = self.compute_fund_matr(kp1, kp2, des1, des2)
+
             F, dmatches, matches = self.compute_fund_matr_ransac(kp1, kp2, des1, des2)
             agreeing_matches = self.find_agreeing_matches(matches, F)
             kp1_agree_ind = [dmatches[i].queryIdx for i in agreeing_matches]
@@ -214,21 +227,23 @@ class PointChaining(object):
                 last_kp = pointview_mtr[-1]
                 new_pointview_row = self.create_pointview_row(kp1_agree_ind, kp2_agree_ind, last_kp)
                 pointview_mtr.append(new_pointview_row)
-                # TODO: almost no points from previous batch are being recognized. Find bug.
+                max_row_length = max(max_row_length, len(new_pointview_row)) # Keep max row length
             else:
                 pointview_mtr.append(kp1_agree_ind)
                 pointview_mtr.append(kp2_agree_ind)
 
             # self.show_matches(agreeing_matches, dmatches, img1, img2, kp1, kp1_agree_ind, kp2)
-            if ind1 > 2:
-                self.show_pointview_mtr(pointview_mtr,img1, img2, kp1, kp2)
+            # if ind1 > 2:
+            #     self.show_pointview_mtr(pointview_mtr,img1, img2, kp1, kp2)
             print len(agreeing_matches) / len(dmatches)
             # Move buffer forward
             img1, kp1, des1 = img2, kp2, des2
-            # TODO: met RANSAC berekenen.
+
+        pointview_2m = self.create_pointview_2m(keypoints, max_row_length, n, pointview_mtr)
+
         print "Saving pointview matrix"
         f = open("../pointview.m","wb")
-        pickle.dump(pointview_mtr,f)
+        pickle.dump(pointview_2m,f)
         print "Done"
         
 
@@ -294,7 +309,7 @@ def read_image(path):
 
 if __name__ == '__main__':
     images = []
-    img_dir = "House/"
+    img_dir = "bearsmall/"
     for file in os.listdir(img_dir):
         images.append(read_image(img_dir + file))
     pc = PointChaining(200, images)
