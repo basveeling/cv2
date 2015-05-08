@@ -46,22 +46,26 @@ def find_dense_block(matrix):
         #if good_column[col] == False:
             #print col
     n_matches = 5
-    print np.shape(matrix)
+    best_full_cols = []
+    # Sliding window over 5 rows
     for r in range(np.shape(matrix)[0]-n_matches):
         full_cols = []
-        best_full_cols = []
+        # Look at columns at depth 5
         for c in range(np.shape(matrix[r:r+n_matches])[1]):
-            if np.all(matrix[r:r+n_matches,c]) is not np.NAN):
-                print matrix[r:r+n_matches,c]
+            # If no NaN in column
+            if not np.any(np.isnan(matrix[r:r+n_matches,c])):
+                # Found full column
                 full_cols.append(matrix[r:r+n_matches,c])
         if len(full_cols) > len(best_full_cols):
             best_full_cols = full_cols
     
+    print best_full_cols
+    return np.array(best_full_cols).T
         
 
 if __name__ == '__main__':
     matr = load_pointview_matrix("../pointview.m")
     norm_matr = normalize_point_coordinates(matr)
-    find_dense_block(matr)
+    dense_matrix = find_dense_block(matr)
     #print norm_matr
     #print(np.sum(pointview_mtr[:],axis=1)[0])
