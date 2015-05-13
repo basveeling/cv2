@@ -61,11 +61,19 @@ def find_dense_block(matrix):
     
     print best_full_cols
     return np.array(best_full_cols).T
-        
+
+
+def derive_structure_motion(dense_matrix):
+    U, D, V = np.linalg.svd(dense_matrix)
+    print 'test'
+
 
 if __name__ == '__main__':
     matr = load_pointview_matrix("../pointview.m")
     norm_matr = normalize_point_coordinates(matr)
     dense_matrix = find_dense_block(matr)
+    derive_structure_motion(dense_matrix)
+    
+    print dense_matrix
     #print norm_matr
     #print(np.sum(pointview_mtr[:],axis=1)[0])
