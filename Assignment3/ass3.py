@@ -45,7 +45,7 @@ def find_dense_block(matrix):
     #for col in good_column:
         #if good_column[col] == False:
             #print col
-    n_matches = 5
+    n_matches = 2 * 5
     best_full_cols = []
     # Sliding window over 5 rows
     for r in range(np.shape(matrix)[0]-n_matches):
@@ -58,22 +58,30 @@ def find_dense_block(matrix):
                 full_cols.append(matrix[r:r+n_matches,c])
         if len(full_cols) > len(best_full_cols):
             best_full_cols = full_cols
-    
-    print best_full_cols
+
     return np.array(best_full_cols).T
 
 
 def derive_structure_motion(dense_matrix):
-    U, D, V = np.linalg.svd(dense_matrix)
-    print 'test'
+    U, W, V_T = np.linalg.svd(dense_matrix)
+    print "Original:" + str(dense_matrix.shape)
+    print "U:" + str(U.shape)
+    print "W:" + str(W.shape)
+    print "V_T:" + str(V_T.shape)
+    U3 = U[:,:3]
+    W3 = np.diag(W[:3])
+    V_T3 = V_T[:3,:]
+    print "U3:" + str(U3.shape)
+    print "W3:" + str(W3.shape)
+    print "V_T3:" + str(V_T3.shape)
 
 
 if __name__ == '__main__':
     matr = load_pointview_matrix("../pointview.m")
     norm_matr = normalize_point_coordinates(matr)
-    dense_matrix = find_dense_block(matr)
-    derive_structure_motion(dense_matrix)
+    measurement_matrix = find_dense_block(matr)
+    derive_structure_motion(measurement_matrix)
     
-    print dense_matrix
+    #print dense_matrix
     #print norm_matr
     #print(np.sum(pointview_mtr[:],axis=1)[0])
