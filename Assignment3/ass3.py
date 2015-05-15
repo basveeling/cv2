@@ -3,8 +3,13 @@ import math
 import os
 
 import numpy as np
+from scipy.linalg import sqrtm
+import matplotlib.pyplot as plt
 import cv2
 import pickle
+
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
 
 # Load pointview matrix (list) from file and convert to matrix
 # using trailing zeros
@@ -24,27 +29,6 @@ def normalize_point_coordinates(matrix):
     return normal_matrix
 
 def find_dense_block(matrix):
-    #filled_rows = {}
-    #good_column = {}
-    #for c,column in enumerate(matrix.T):
-        #filled_rows[c] = []
-        #for r,val in enumerate(column):
-            #if val is not np.NAN:
-                #filled_rows[c].append(r)
-            #else:
-                ## When first 0 is encountered after non-0, break
-                #if (len(filled_rows) > 0):
-                    ## Check if there were enough filled rows to call this a dense block
-                    #if (len(filled_rows) > 6):
-                        #good_column[c] = True
-                    #else:
-                        #good_column[c] = False
-                    
-                    #break
-    
-    #for col in good_column:
-        #if good_column[col] == False:
-            #print col
     n_matches = 2 * 5
     best_full_cols = []
     # Sliding window over 5 rows
@@ -63,25 +47,37 @@ def find_dense_block(matrix):
 
 
 def derive_structure_motion(dense_matrix):
+    # Do singular value decomposition
     U, W, V_T = np.linalg.svd(dense_matrix)
-    print "Original:" + str(dense_matrix.shape)
-    print "U:" + str(U.shape)
-    print "W:" + str(W.shape)
-    print "V_T:" + str(V_T.shape)
+    
+    # Take first three rows/columns
     U3 = U[:,:3]
     W3 = np.diag(W[:3])
     V_T3 = V_T[:3,:]
-    print "U3:" + str(U3.shape)
-    print "W3:" + str(W3.shape)
-    print "V_T3:" + str(V_T3.shape)
+    
+    # Compute Motion and Structure matrices
+    M = np.dot(U3,sqrtm(W3))
+    S = np.dot(sqrtm(W3),V_T3)
+    
+    # TODO (or in other method): eliminate affine ambiguity
+    
+    return M,S
 
 
+def plot_structure_motion(M,S):   
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(S[0,:], S[1,:], S[2,:])
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    plt.show()
+    
 if __name__ == '__main__':
     matr = load_pointview_matrix("../pointview.m")
     norm_matr = normalize_point_coordinates(matr)
     measurement_matrix = find_dense_block(matr)
-    derive_structure_motion(measurement_matrix)
-    
-    #print dense_matrix
-    #print norm_matr
-    #print(np.sum(pointview_mtr[:],axis=1)[0])
+    M,S = derive_structure_motion(measurement_matrix)
+    plot_structure_motion(M,S)
