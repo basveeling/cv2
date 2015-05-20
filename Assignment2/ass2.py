@@ -311,7 +311,7 @@ def read_image(path):
 
 if __name__ == '__main__':
     images = []
-    img_dir = "bearsmall/"
+    img_dir = "House/"
     for file in os.listdir(img_dir):
         images.append(read_image(img_dir + file))
     pc = PointChaining(200, images)
