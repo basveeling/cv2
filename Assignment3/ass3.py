@@ -80,19 +80,22 @@ def derive_structure_motion(dense_matrix):
     # # L = np.random.rand(3,3)
     # L,_,_,_ = np.linalg.lstsq(A,B)
     # print np.dot(np.dot(a01,L),a02)
-    return Mnew,Snew
+    return Mnew,Snew,S
 
 
 def eliminate_affine(M, S):
     n_cameras = int(M.shape[0] / 2)
-    A = M
+    A = M[0:n_cameras*2, :]
     B = np.empty((2 * n_cameras, 3))
     for i in range(n_cameras):
-        B[i * 2:i * 2 + 2, :] = np.eye(3).dot(np.linalg.pinv(A[i * 2:i * 2 + 2, :].T).T).T
+        B[i * 2:i * 2 + 2, :] = np.linalg.pinv(A[i * 2:i * 2 + 2, :].T)
     L, _, _, _ = np.linalg.lstsq(A, B)
     C = np.linalg.cholesky(L)
     Mnew = M.dot(C)
     Snew = np.linalg.pinv(C).dot(S)
+    print "The following numbers express the learned L matrix, should be approx. 0,0,1,1"
+    for i in range(n_cameras):
+        print np.dot(np.dot(M[i*2, :], L), M[i*2+1, :].T), np.dot(np.dot(M[i*2+1, :], L), M[i*2, :].T), np.dot(np.dot(M[i*2, :], L), M[i*2, :].T), np.dot(np.dot(M[i*1, :], L), M[i*1, :].T)
     return Mnew, Snew
 
 
@@ -100,19 +103,19 @@ def plot_structure_motion(M,S):
     # This now plots an cross-eye sterescopic version of the points
     fig = plt.figure(figsize=(20,10))
     gs = GridSpec(1, 2)
-    ax1 = fig.add_subplot(gs[0], projection='3d')
-    ax2 = fig.add_subplot(gs[1], projection='3d')
+    ax1 = fig.add_subplot(gs[0], projection='3d',aspect='equal')
+    ax2 = fig.add_subplot(gs[1], projection='3d',aspect='equal')
 
-    ax2.view_init(elev=18, azim=-18-5)
     ax1.view_init(elev=18, azim=-18)
+    ax2.view_init(elev=18, azim=-18-4)
 
-    ax2.scatter(S[0,:], S[1,:], S[2,:],depthshade=False)
-    ax1.scatter(S[0, :], S[1, :], S[2, :],depthshade=False)
+    ax1.scatter(S[0, :], S[1, :], S[2, :],depthshade=True)
+    ax2.scatter(S[0,:], S[1,:], S[2,:],depthshade=True)
 
     meanz = np.mean(S[2, :])
-    std = np.std(S[2, :])
-    ax2.set_zlim3d(meanz - std, meanz + std)
-    ax1.set_zlim3d(meanz - std, meanz + std)
+    stdz = 2*np.std(S[2, :])
+    # ax2.set_zlim3d(meanz - stdz, meanz + stdz)
+    # ax1.set_zlim3d(meanz - stdz, meanz + stdz)
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_zlabel('Z')
@@ -127,5 +130,6 @@ if __name__ == '__main__':
     matr = load_pointview_matrix("../pointview.m")
     norm_matr = normalize_point_coordinates(matr)
     measurement_matrix = find_dense_block(matr)
-    M,S = derive_structure_motion(measurement_matrix)
+    M,S,Sam= derive_structure_motion(measurement_matrix)
     plot_structure_motion(M,S)
+    # plot_structure_motion(M,Sam)
