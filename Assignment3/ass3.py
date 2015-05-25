@@ -28,23 +28,6 @@ def normalize_point_coordinates(matrix):
         normal_matrix[row] = matrix[row] - mean
     return normal_matrix
 
-def find_dense_blocks(matrix):
-    n_matches = 2 * 3
-    sorted_blocks = []
-    # Sliding window over 5 rows
-    for r in range(np.shape(matrix)[0]-n_matches):
-        full_cols = []
-        # Look at columns at depth 5
-        for c in range(np.shape(matrix[r:r+n_matches])[1]):
-            # If no NaN in column
-            if not np.any(np.isnan(matrix[r:r+n_matches,c])):
-                # Found full column
-                full_cols.append(matrix[r:r+n_matches,c])
-        if len(full_cols) > len(sorted_blocks):
-            sorted_blocks.append((len(full_cols),np.array(full_cols).T))
-    sorted_blocks.sort(key=lambda x: x[0],reverse=True)
-    print "Found a block of %d by %d" % (len(sorted_blocks), len(sorted_blocks[0]))
-    return sorted_blocks
 
 def find_dense_block(matrix):
     n_matches = 2 * 3
@@ -53,8 +36,6 @@ def find_dense_block(matrix):
     cols = matrix.shape[1]
     # Sliding window over 5 rows
     for r in range(0, np.shape(matrix)[0]-n_matches, 2):
-        if r == 8:
-            break
         full_cols = []
         # Look at columns at depth 5
         for c in range(cols):
