@@ -28,9 +28,9 @@ def normalize_point_coordinates(matrix):
         normal_matrix[row] = matrix[row] - mean
     return normal_matrix
 
-def find_dense_block(matrix):
-    n_matches = 2 * 5
-    best_full_cols = []
+def find_dense_blocks(matrix):
+    n_matches = 2 * 4
+    sorted_blocks = []
     # Sliding window over 5 rows
     for r in range(np.shape(matrix)[0]-n_matches):
         full_cols = []
@@ -40,10 +40,11 @@ def find_dense_block(matrix):
             if not np.any(np.isnan(matrix[r:r+n_matches,c])):
                 # Found full column
                 full_cols.append(matrix[r:r+n_matches,c])
-        if len(full_cols) > len(best_full_cols):
-            best_full_cols = full_cols
-    print "Found a block of %d by %d" % (len(best_full_cols), len(best_full_cols[0]))
-    return np.array(best_full_cols).T
+        if len(full_cols) > len(sorted_blocks):
+            sorted_blocks.append((len(full_cols),np.array(full_cols).T))
+    sorted_blocks.sort(key=lambda x: x[0],reverse=True)
+    print "Found a block of %d by %d" % (len(sorted_blocks), len(sorted_blocks[0]))
+    return sorted_blocks
 
 
 def derive_structure_motion(dense_matrix):
@@ -80,7 +81,7 @@ def derive_structure_motion(dense_matrix):
     # # L = np.random.rand(3,3)
     # L,_,_,_ = np.linalg.lstsq(A,B)
     # print np.dot(np.dot(a01,L),a02)
-    return Mnew,Snew,S
+    return Mnew,Snew,M,S
 
 
 def eliminate_affine(M, S):
@@ -99,29 +100,29 @@ def eliminate_affine(M, S):
     return Mnew, Snew
 
 
-def plot_structure_motion(M,S):
+def plot_structure_motion(S):
     # This now plots an cross-eye sterescopic version of the points
     fig = plt.figure(figsize=(20,10))
-    gs = GridSpec(1, 2)
-    ax1 = fig.add_subplot(gs[0], projection='3d',aspect='equal')
-    ax2 = fig.add_subplot(gs[1], projection='3d',aspect='equal')
+    gs = GridSpec(1, 1)
+    ax1 = fig.add_subplot(gs[0], projection='3d')#,aspect='equal')
+    # ax2 = fig.add_subplot(gs[1], projection='3d',aspect='equal')
 
     ax1.view_init(elev=18, azim=-18)
-    ax2.view_init(elev=18, azim=-18-4)
+    # ax2.view_init(elev=18, azim=-18-4)
 
     ax1.scatter(S[0, :], S[1, :], S[2, :],depthshade=True)
-    ax2.scatter(S[0,:], S[1,:], S[2,:],depthshade=True)
+    # ax2.scatter(S[0,:], S[1,:], S[2,:],depthshade=True)
 
     meanz = np.mean(S[2, :])
     stdz = 2*np.std(S[2, :])
-    # ax2.set_zlim3d(meanz - stdz, meanz + stdz)
+#     # ax2.set_zlim3d(meanz - stdz, meanz + stdz)
     # ax1.set_zlim3d(meanz - stdz, meanz + stdz)
     ax1.set_xlabel('X')
     ax1.set_ylabel('Y')
     ax1.set_zlabel('Z')
-    ax2.set_xlabel('X')
-    ax2.set_ylabel('Y')
-    ax2.set_zlabel('Z')
+    # ax2.set_xlabel('X')
+    # ax2.set_ylabel('Y')
+    # ax2.set_zlabel('Z')
     # ax.set_xlim3d([-10,10])
     # ax.set_ylim3d([-10,10])
     plt.show()
@@ -129,7 +130,11 @@ def plot_structure_motion(M,S):
 if __name__ == '__main__':
     matr = load_pointview_matrix("../pointview.m")
     norm_matr = normalize_point_coordinates(matr)
-    measurement_matrix = find_dense_block(matr)
-    M,S,Sam= derive_structure_motion(measurement_matrix)
-    plot_structure_motion(M,S)
+    dense_blocks = find_dense_blocks(matr)
+    structures = []
+    for _,measurement_matrix in dense_blocks[0:1]:
+        M,S,Mam,Sam= derive_structure_motion(measurement_matrix)
+        structures.append(S  )
+
+    plot_structure_motion(np.concatenate(structures,axis=1))
     # plot_structure_motion(M,Sam)
