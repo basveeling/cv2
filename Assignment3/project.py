@@ -113,9 +113,9 @@ class PointChaining(object):
         self.n_images = len(images)
         self.list_keypoints = [None] * self.n_images
         self.list_descriptors = [None] * self.n_images
-        self.drawing_lvl = 3
+        self.drawing_lvl = 0
         self.use_cv_fund = False
-        self.debug_est_fund = True
+        self.debug_est_fund = False
 
     def run_pipeline(self):
 
@@ -240,7 +240,6 @@ class PointChaining(object):
                 cur_inlier_indexes = self.find_inliers(est_F, homo_coords1, homo_coords2, n_matches)
 
                 if len(cur_inlier_indexes) >= len(best_inlier_indexes):
-                    print len(cur_inlier_indexes), n_matches
                     best_inlier_indexes = cur_inlier_indexes
 
             # Re-estimate with best indexes

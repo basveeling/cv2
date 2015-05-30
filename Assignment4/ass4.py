@@ -1,4 +1,5 @@
 from __future__ import division
+from collections import Counter
 import math
 import os
 
@@ -30,24 +31,25 @@ def normalize_point_coordinates(matrix):
 
 
 def find_dense_block(matrix):
-    n_matches = 2 * 3
-    best_full_cols = []
+    n_matches = 2 * 4
     best_r = 0
     cols = matrix.shape[1]
+    best_indexes = []
     # Sliding window over 5 rows
     for r in range(0, np.shape(matrix)[0]-n_matches, 2):
         full_cols = []
+        indexes = []
         # Look at columns at depth 5
         for c in range(cols):
             # If no NaN in column
             if not np.any(np.isnan(matrix[r:r+n_matches,c])):
                 # Found full column
-                full_cols.append(matrix[r:r+n_matches,c])
-        if len(full_cols) > len(best_full_cols):
-            best_full_cols = full_cols
+                indexes.append(c)
+        if len(indexes) > len(best_indexes):
+            best_indexes = indexes
             best_r = r
-    print "Found a block of %d by %d starting at r %d" % (len(best_full_cols), len(best_full_cols[0]), best_r)
-    return np.array(best_full_cols).T
+    print "Found a block of %d by %d starting at r %d" % (n_matches/2, len(best_indexes), best_r)
+    return matr[best_r:best_r+n_matches,best_indexes], best_indexes, best_r, n_matches
 
 def derive_structure_motion(dense_matrix):
     # Do singular value decomposition
@@ -56,13 +58,12 @@ def derive_structure_motion(dense_matrix):
     # Take first three rows/columns
     U3 = U[:,:3]
     W3 = np.diag(W[:3])
-    V_T3 = V_T[:3,:] #TODO: Return this to non transpose
+    V_T3 = V_T[:3,:]
     print "shapes UWVT:", U3.shape, W3.shape, V_T3.shape
     # Compute Motion and Structure matrices
     M = np.dot(U3, sqrtm(W3))
     S = np.dot(sqrtm(W3), V_T3)
     
-    # TODO (or in other method): eliminate affine ambiguity
     Mnew, Snew = eliminate_affine(M, S)
 
     return Mnew,Snew,M,S
@@ -110,12 +111,50 @@ def plot_structure_motion(S):
     # ax.set_xlim3d([-10,10])
     # ax.set_ylim3d([-10,10])
     plt.show()
-    
-if __name__ == '__main__':
+
+
+def run():
+    global matr
     matr = load_pointview_matrix("../pointview_project.m")
     # cv2.imshow('mtr',matr)
     # cv2.waitKey(0)
+    n_cameras = int(matr.shape[0] / 2)
+    n_cols = matr.shape[1]
     norm_matr = normalize_point_coordinates(matr)
-    measurement_matrix = find_dense_block(matr)
-    M,S,Mam,Sam= derive_structure_motion(measurement_matrix)
-    plot_structure_motion(S)
+    measurement_matrix, seen_cols, best_r, n_matches = find_dense_block(matr)
+    M, S, Mam, Sam = derive_structure_motion(measurement_matrix)
+    seen_rows = range(best_r, best_r + n_matches)
+    unseen_cols = [i for i in range(n_cols) if i not in seen_cols]
+    unseen_rows = [i for i in range(n_cameras * 2) if i not in seen_rows]
+    best_col = find_best_col(matr, seen_rows, unseen_cols)
+    best_row = find_best_row(matr, seen_cols, unseen_rows)
+    # plot_structure_motion(S)
+
+    if best_row > best_col:
+        pass
+    else:
+        pass
+
+
+def find_best_col(matr, seen_rows, unseen_cols):
+    covered_cols = Counter()
+    for col in unseen_cols:
+        count = np.count_nonzero(~np.isnan(matr[seen_rows, col])) / 2
+        if count > 2:
+            covered_cols[col] = count
+    best_col = covered_cols.most_common(1)[0][0]
+    return best_col
+
+
+def find_best_row(matr, seen_cols, unseen_rows):
+    covered_rows = Counter()
+    for row in unseen_rows:
+        count = np.count_nonzero(~np.isnan(matr[row, seen_cols]))
+        if count > 2:
+            covered_rows[row] = count
+    best_row = covered_rows.most_common(1)[0][0]
+    return best_row
+
+
+if __name__ == '__main__':
+    run()
