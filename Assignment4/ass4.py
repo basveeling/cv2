@@ -31,7 +31,7 @@ def normalize_point_coordinates(matrix):
 
 
 def find_dense_block(matrix):
-    n_matches = 2 * 4
+    n_matches = 2 * 3
     best_r = 0
     cols = matrix.shape[1]
     best_indexes = []
@@ -54,12 +54,11 @@ def find_dense_block(matrix):
 def derive_structure_motion(dense_matrix):
     # Do singular value decomposition
     U, W, V_T = np.linalg.svd(dense_matrix)
-    
     # Take first three rows/columns
     U3 = U[:,:3]
     W3 = np.diag(W[:3])
     V_T3 = V_T[:3,:]
-    print "shapes UWVT:", U3.shape, W3.shape, V_T3.shape
+    print "shapes 3UWVT:", U3.shape, W3.shape, V_T3.shape
     # Compute Motion and Structure matrices
     M = np.dot(U3, sqrtm(W3))
     S = np.dot(sqrtm(W3), V_T3)
@@ -121,39 +120,46 @@ def run():
     n_cameras = int(matr.shape[0] / 2)
     n_cols = matr.shape[1]
     norm_matr = normalize_point_coordinates(matr)
-    measurement_matrix, seen_cols, best_r, n_matches = find_dense_block(matr)
+    measurement_matrix, seen_cols, best_r, n_matches = find_dense_block(norm_matr)
+    
+    sufficient_coverage=False
+    while (sufficient_coverage==False):
+        seen_rows = range(best_r, best_r + n_matches)
+        unseen_cols = [i for i in range(n_cols) if i not in seen_cols]
+        unseen_rows = [i for i in range(n_cameras * 2) if i not in seen_rows]
+        best_col, best_col_length = find_best_col(norm_matr, seen_rows, unseen_cols)
+        best_row, best_row_length = find_best_row(norm_matr, seen_cols, unseen_rows)
+        # plot_structure_motion(S)
+        if best_row_length > best_col_length:
+            measurement_matrix = np.vstack(measurement_matrix, norm_matr[best_row,:])
+            seen_rows.append(best_row)
+        else:
+            pass
+        sufficient_coverage = True
+    
     M, S, Mam, Sam = derive_structure_motion(measurement_matrix)
-    seen_rows = range(best_r, best_r + n_matches)
-    unseen_cols = [i for i in range(n_cols) if i not in seen_cols]
-    unseen_rows = [i for i in range(n_cameras * 2) if i not in seen_rows]
-    best_col = find_best_col(matr, seen_rows, unseen_cols)
-    best_row = find_best_row(matr, seen_cols, unseen_rows)
-    # plot_structure_motion(S)
-
-    if best_row > best_col:
-        pass
-    else:
-        pass
 
 
 def find_best_col(matr, seen_rows, unseen_cols):
     covered_cols = Counter()
     for col in unseen_cols:
         count = np.count_nonzero(~np.isnan(matr[seen_rows, col])) / 2
-        if count > 2:
+        if count >= 2: # TODO: Equal or more than 2, does this make sense? Why is the count never more than 2?
             covered_cols[col] = count
     best_col = covered_cols.most_common(1)[0][0]
-    return best_col
+    best_length = covered_cols.most_common(1)[0][1]
+    return best_col, best_length
 
 
 def find_best_row(matr, seen_cols, unseen_rows):
     covered_rows = Counter()
     for row in unseen_rows:
         count = np.count_nonzero(~np.isnan(matr[row, seen_cols]))
-        if count > 2:
+        if count >= 2: 
             covered_rows[row] = count
     best_row = covered_rows.most_common(1)[0][0]
-    return best_row
+    best_length = covered_rows.most_common(1)[0][1]
+    return best_row, best_length
 
 
 if __name__ == '__main__':
