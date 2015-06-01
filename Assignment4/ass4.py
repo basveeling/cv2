@@ -130,23 +130,35 @@ def run():
         unseen_rows = [i for i in range(n_cameras * 2) if i not in seen_rows]
         best_col, best_col_length = find_best_col(norm_matr, seen_rows, unseen_cols)
         best_row, best_row_length = find_best_row(norm_matr, seen_cols, unseen_rows)
-        if best_row_length > best_col_length: # TODO: can we compare these quantities?
-            print "Appending row"
-            new_row = []
-            for r in seen_cols:
-                new_row.append(norm_matr[best_row,r])
-            measurement_matrix = np.vstack((measurement_matrix, new_row))
-            seen_rows.append(best_row)
-        else:
-            print "Appending col"
-            # Take rows of the column which are in seen_rows,
-            # so match with rows in the patch
-            new_column = []
-            for i in seen_rows:
-                new_column.append(norm_matr[i,best_col])
-            measurement_matrix = np.column_stack((measurement_matrix, new_column))
-            seen_cols.append(best_col)
-        sufficient_coverage = True
+        
+        # If rows or columns have been found:
+        if best_col != -1 or best_row != -1:
+            # Append row or column to measurement matrix
+            if best_row_length > best_col_length: # TODO: can we compare these quantities?
+                print "Appending row"
+                new_row = []
+                for r in seen_cols:
+                    new_row.append(norm_matr[best_row,r])
+                measurement_matrix = np.vstack((measurement_matrix, new_row))
+                seen_rows.append(best_row)
+                # TODO: Remove row from norm_matr?
+            else:
+                print "Appending col"
+                # Take rows of the column which are in seen_rows,
+                # so match with rows in the patch
+                new_column = []
+                for i in seen_rows:
+                    new_column.append(norm_matr[i,best_col])
+                measurement_matrix = np.column_stack((measurement_matrix, new_column))
+                seen_cols.append(best_col)
+                # TODO: Remove column from norm_matr?
+            
+            # TODO: Do bundle adjustment
+            # Possibly http://docs.opencv.org/modules/stitching/doc/motion_estimation.html
+        
+        # If no new rows and now new columns can be found, coverage is sufficient
+        if (best_col == -1) and (best_row == -1):
+            sufficient_coverage = True
     
     M, S, Mam, Sam = derive_structure_motion(measurement_matrix)
     plot_structure_motion(S)
@@ -156,10 +168,15 @@ def find_best_col(matr, seen_rows, unseen_cols):
     covered_cols = Counter()
     for col in unseen_cols:
         count = np.count_nonzero(~np.isnan(matr[seen_rows, col])) / 2
-        if count >= 2: # TODO: Equal or more than 2, does this make sense? Why is the count never more than 2?
+        if count >= 2: # TODO: Why is the count never more than 2?
             covered_cols[col] = count
-    best_col = covered_cols.most_common(1)[0][0]
-    best_length = covered_cols.most_common(1)[0][1]
+    if len(covered_cols) > 0:
+        best_col = covered_cols.most_common(1)[0][0]
+        best_length = covered_cols.most_common(1)[0][1]
+    else:
+        # Return -1 if no new columns can be found
+        best_col = -1
+        best_length = -1
     return best_col, best_length
 
 
@@ -167,10 +184,15 @@ def find_best_row(matr, seen_cols, unseen_rows):
     covered_rows = Counter()
     for row in unseen_rows:
         count = np.count_nonzero(~np.isnan(matr[row, seen_cols]))
-        if count >= 2: 
+        if count >= 2: # TODO: Why is the count never more than 2? According to description, 3 points should be visible
             covered_rows[row] = count
-    best_row = covered_rows.most_common(1)[0][0]
-    best_length = covered_rows.most_common(1)[0][1]
+    if len(covered_rows) > 0:
+        best_row = covered_rows.most_common(1)[0][0]
+        best_length = covered_rows.most_common(1)[0][1]
+    else:
+        # Return -1 if no new rows can be found
+        best_row = -1
+        best_length = -1
     return best_row, best_length
 
 
