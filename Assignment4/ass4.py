@@ -12,6 +12,7 @@ import pickle
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.gridspec import GridSpec
 
+
 # Load pointview matrix (list) from file and convert to matrix
 # using trailing zeros
 def load_pointview_matrix(filename):
@@ -129,15 +130,26 @@ def run():
         unseen_rows = [i for i in range(n_cameras * 2) if i not in seen_rows]
         best_col, best_col_length = find_best_col(norm_matr, seen_rows, unseen_cols)
         best_row, best_row_length = find_best_row(norm_matr, seen_cols, unseen_rows)
-        # plot_structure_motion(S)
-        if best_row_length > best_col_length:
-            measurement_matrix = np.vstack(measurement_matrix, norm_matr[best_row,:])
+        if best_row_length > best_col_length: # TODO: can we compare these quantities?
+            print "Appending row"
+            new_row = []
+            for r in seen_cols:
+                new_row.append(norm_matr[best_row,r])
+            measurement_matrix = np.vstack((measurement_matrix, new_row))
             seen_rows.append(best_row)
         else:
-            pass
+            print "Appending col"
+            # Take rows of the column which are in seen_rows,
+            # so match with rows in the patch
+            new_column = []
+            for i in seen_rows:
+                new_column.append(norm_matr[i,best_col])
+            measurement_matrix = np.column_stack((measurement_matrix, new_column))
+            seen_cols.append(best_col)
         sufficient_coverage = True
     
     M, S, Mam, Sam = derive_structure_motion(measurement_matrix)
+    plot_structure_motion(S)
 
 
 def find_best_col(matr, seen_rows, unseen_cols):
