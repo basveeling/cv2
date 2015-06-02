@@ -32,12 +32,12 @@ def normalize_point_coordinates(matrix):
 
 
 def find_dense_block(matrix):
-    n_rows = 2 * 3
+    n_rows = 2 * 4
     best_r = 0
     cols = matrix.shape[1]
     best_indexes = []
     # Sliding window over 5 rows
-    for r in range(0, np.shape(matrix)[0] - n_rows, 2):
+    for r in range(0, np.shape(matrix)[0] - n_rows+1, 2):
         full_cols = []
         indexes = []
         # Look at columns at depth 5
@@ -118,6 +118,16 @@ def plot_structure_motion(S):
     plt.show()
 
 
+def generate_dummy_matrix():
+    d = 10
+    s = 3
+
+    matr = np.array([[0,d,0,d,0,d,0,d],[0,0,d,d,0,0,d,d],
+            [0-s,d-s,0-s,d-s,0+s,d+s,0+s,d+s],[0,0,d,d,0+s*2,0+s*2,d+s*2,d+s*2],
+            [0+s,d+s,0+s,d+s,0-s,d-s,0-s,d-s],[0,0,d,d,0+s*2,0+s*2,d+s*2,d+s*2]
+            ])
+    return matr
+
 def run():
     """
     Cam index is in steps of 2
@@ -126,18 +136,24 @@ def run():
     """
     global matr
     matr = load_pointview_matrix("../pointview_project.m")
+    # matr = generate_dummy_matrix()
     # cv2.imshow('mtr',matr)
     # cv2.waitKey(0)
     n_cameras = int(matr.shape[0] / 2)
     n_cols = matr.shape[1]
     norm_matr = normalize_point_coordinates(matr)
     measurement_matrix, seen_cols, start_cam, n_rows = find_dense_block(norm_matr)
-    M, S, Mam, Sam = derive_structure_motion(measurement_matrix)
-
+    Mp, Sp, Mam, Sam = derive_structure_motion(measurement_matrix)
+    print("printing")
+    # plot_structure_motion(S)
     seen_cams = range(start_cam, start_cam + n_rows, 2)
     unseen_cols = [i for i in range(n_cols) if i not in seen_cols]
     unseen_cams = [i for i in range(0, n_cameras * 2, 2) if i not in seen_cams]
     sufficient_coverage = False
+
+    D = norm_matr[range(min(seen_cams), max(seen_cams) + 2), :][:, seen_cols]
+    S, _, _, _ = np.linalg.lstsq(Mp, D)
+    M, _, _, _ = np.linalg.lstsq(np.linalg.pinv(D), np.linalg.pinv(S))
     while (sufficient_coverage == False):
         best_col, best_col_length = find_best_col(norm_matr, seen_cams, unseen_cols)
         best_cam, best_cam_length = find_best_cam(norm_matr, seen_cols, unseen_cams)
@@ -147,46 +163,58 @@ def run():
             # Append row or column to measurement matrix
             if best_cam_length > best_col_length:  # Adding a camera
                 print '\nAdding camera %d' % int(best_cam / 2)
+                seen_cams.append(best_cam)
                 not_nan_cols = np.where((~np.isnan(norm_matr[best_cam])))
                 overlapping_cols = np.intersect1d(seen_cols, not_nan_cols)
                 structure_indexes = [i for i, col in enumerate(seen_cols) if col in overlapping_cols]
-                A = []
-                b = []
-                for col_i, s_i in zip(overlapping_cols, structure_indexes):
-                    xyz = list(S[:, s_i])
-                    A.append(xyz + [0, 0, 0])
-                    A.append([0, 0, 0] + xyz)
-                    b.append(norm_matr[best_cam, col_i])
-                    b.append(norm_matr[best_cam + 1, col_i])
-                A = np.array(A)
-                b = np.array(b)
+                
+                seen_rows = []
+                seen_ms = []
+                for m_i,cam_i in enumerate(seen_cams):
+                    if ~np.any(np.isnan(norm_matr[cam_i,overlapping_cols])):
+                        seen_rows.append(cam_i)
+                        seen_rows.append(cam_i+1)
+                        seen_ms.append(m_i*2)
+                        seen_ms.append(m_i*2+1)
+                D2 = norm_matr[seen_rows, :][:, overlapping_cols]
+                S2 = S[:, structure_indexes]
+                M2, _, _, _ = np.linalg.lstsq(np.linalg.pinv(D2), np.linalg.pinv(S2))
 
-                cam_params, _, rnk, sing = np.linalg.lstsq(A, b)
                 # TODO: make rank 3?
                 # TODO: the new params look a bit weird, check if we need to constrain somehow?
-                M = np.vstack((M, 3 * np.reshape(cam_params, (2, 3))))
-                seen_cams.append(best_cam)
+
+                M.resize((M.shape[0] + 2,3), refcheck=False)
+                print M[seen_ms,:] - M2
+                M[seen_ms,:] = M2
+
                 unseen_cams.remove(best_cam)
             # measurement_matrix = np.vstack((measurement_matrix, norm_matr[[best_cam, best_cam + 1], seen_cols]))
             # TODO: Remove row from norm_matr?
-            else:  # Adding a point
+            elif best_col != -1:  # Adding a point
                 print "col %d" % best_col,
-
+                seen_cols.append(best_col)
                 covered_cams = [(m_i, cam_i) for m_i, cam_i in enumerate(seen_cams) if
                                 ~np.isnan(norm_matr[cam_i, best_col])]
+                covered_cols = np.array([(ind,i) for ind,i in enumerate(seen_cols) if np.all(~np.isnan(norm_matr[np.array(covered_cams)[:,1], i]))])
                 A = []
                 b = []
                 for m_i, cam_i in covered_cams:
                     A.append(M[m_i*2])
                     A.append(M[m_i*2 + 1])
-                    b.append(norm_matr[cam_i, best_col])
-                    b.append(norm_matr[cam_i + 1, best_col])
+                    b.append(norm_matr[cam_i, covered_cols[:,1]])
+                    b.append(norm_matr[cam_i + 1, covered_cols[:,1]])
                 A, b = np.array(A), np.array(b)
 
-                xyz,_,_,_ = np.linalg.lstsq(A,b)
-                # TODO: this xyz seems weird.
-                S = np.hstack((S,np.atleast_2d(xyz).T))
-                seen_cols.append(best_col)
+                xyz, _, rnk, sing = np.linalg.lstsq(A,b)
+                # Resize S
+                S.resize((3, S.shape[1]+1), refcheck=False)
+                # Find the erronous translation and remove
+                diff = np.median(S[:, covered_cols[:, 0]] - xyz, axis=1)
+                xyz[0,:] += diff[0]
+                xyz[1,:] += diff[1]
+                xyz[2,:] += diff[2]
+                S[:,covered_cols[:,0]] = xyz
+
                 unseen_cols.remove(best_col)
                 # TODO: Remove column from norm_matr?
 
@@ -204,7 +232,7 @@ def find_best_col(matr, seen_cams, unseen_cols):
     covered_cols = Counter()
     for col in unseen_cols:
         count = np.count_nonzero(~np.isnan(matr[seen_cams, col]))
-        if count >= 2:  # TODO: Why is the count never more than 2?
+        if count >= 4:
             covered_cols[col] = count
     if len(covered_cols) > 0:
         best_col = covered_cols.most_common(1)[0][0]
@@ -220,7 +248,7 @@ def find_best_cam(matr, seen_cols, unseen_cams):
     covered_cams = Counter()
     for cam in unseen_cams:
         count = np.count_nonzero(~np.isnan(matr[cam, seen_cols]))
-        if count >= 3:  # TODO: Why is the count never more than 2? According to description, 3 points should be visible
+        if count >= 20:  # TODO: Why is the count never more than 2? According to description, 3 points should be visible
             covered_cams[cam] = count
     if len(covered_cams) > 0:
         best_cam = covered_cams.most_common(1)[0][0]
