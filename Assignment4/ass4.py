@@ -7,6 +7,8 @@ from scipy.linalg import sqrtm
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
+from mpl_toolkits.mplot3d import Axes3D
+
 
 
 
@@ -91,6 +93,7 @@ def plot_structure_motion(S):
     # This now plots an cross-eye sterescopic version of the points
     fig = plt.figure(figsize=(20, 10))
     gs = GridSpec(1, 2)
+
     ax1 = fig.add_subplot(gs[0], projection='3d', aspect='equal')  # ,aspect='equal')
     ax2 = fig.add_subplot(gs[1], projection='3d', aspect='equal')
 
@@ -131,11 +134,11 @@ def run():
     measurement_matrix, seen_cols, start_cam, n_rows = find_dense_block(norm_matr)
     M, S, Mam, Sam = derive_structure_motion(measurement_matrix)
 
+    seen_cams = range(start_cam, start_cam + n_rows, 2)
+    unseen_cols = [i for i in range(n_cols) if i not in seen_cols]
+    unseen_cams = [i for i in range(0, n_cameras * 2, 2) if i not in seen_cams]
     sufficient_coverage = False
     while (sufficient_coverage == False):
-        seen_cams = range(start_cam, start_cam + n_rows, 2)
-        unseen_cols = [i for i in range(n_cols) if i not in seen_cols]
-        unseen_cams = [i for i in range(0, n_cameras * 2, 2) if i not in seen_cams]
         best_col, best_col_length = find_best_col(norm_matr, seen_cams, unseen_cols)
         best_cam, best_cam_length = find_best_cam(norm_matr, seen_cols, unseen_cams)
 
@@ -143,39 +146,48 @@ def run():
         if best_col != -1 or best_cam != -1:
             # Append row or column to measurement matrix
             if best_cam_length > best_col_length:  # Adding a camera
-                print 'Adding camera %d' % int(best_cam / 2)
+                print '\nAdding camera %d' % int(best_cam / 2)
                 not_nan_cols = np.where((~np.isnan(norm_matr[best_cam])))
                 overlapping_cols = np.intersect1d(seen_cols, not_nan_cols)
                 structure_indexes = [i for i, col in enumerate(seen_cols) if col in overlapping_cols]
                 A = []
                 b = []
-                for col_i,s_i in zip(overlapping_cols,structure_indexes):
-                    xyz = list(S[:,s_i])
-                    A.append(xyz+[0, 0 , 0])
-                    A.append([0, 0 , 0]+xyz)
-                    b.append(norm_matr[best_cam,col_i])
-                    b.append(norm_matr[best_cam+1,col_i])
+                for col_i, s_i in zip(overlapping_cols, structure_indexes):
+                    xyz = list(S[:, s_i])
+                    A.append(xyz + [0, 0, 0])
+                    A.append([0, 0, 0] + xyz)
+                    b.append(norm_matr[best_cam, col_i])
+                    b.append(norm_matr[best_cam + 1, col_i])
                 A = np.array(A)
                 b = np.array(b)
 
-                cam_params,_,rnk,sing = np.linalg.lstsq(A,b)
+                cam_params, _, rnk, sing = np.linalg.lstsq(A, b)
                 # TODO: make rank 3?
                 # TODO: the new params look a bit weird, check if we need to constrain somehow?
-                M = np.vstack((M,3*np.reshape(cam_params,(2,3))))
+                M = np.vstack((M, 3 * np.reshape(cam_params, (2, 3))))
                 seen_cams.append(best_cam)
                 unseen_cams.remove(best_cam)
-
             # measurement_matrix = np.vstack((measurement_matrix, norm_matr[[best_cam, best_cam + 1], seen_cols]))
             # TODO: Remove row from norm_matr?
             else:  # Adding a point
-                print "Appending col"
-                # Take rows of the column which are in seen_cams,
-                # so match with rows in the patch
-                new_column = []
-                for i in seen_cams:
-                    new_column.append(norm_matr[i, best_col])
-                measurement_matrix = np.column_stack((measurement_matrix, new_column))
+                print "col %d" % best_col,
+
+                covered_cams = [(m_i, cam_i) for m_i, cam_i in enumerate(seen_cams) if
+                                ~np.isnan(norm_matr[cam_i, best_col])]
+                A = []
+                b = []
+                for m_i, cam_i in covered_cams:
+                    A.append(M[m_i*2])
+                    A.append(M[m_i*2 + 1])
+                    b.append(norm_matr[cam_i, best_col])
+                    b.append(norm_matr[cam_i + 1, best_col])
+                A, b = np.array(A), np.array(b)
+
+                xyz,_,_,_ = np.linalg.lstsq(A,b)
+                # TODO: this xyz seems weird.
+                S = np.hstack((S,np.atleast_2d(xyz).T))
                 seen_cols.append(best_col)
+                unseen_cols.remove(best_col)
                 # TODO: Remove column from norm_matr?
 
                 # TODO: Do bundle adjustment
@@ -188,10 +200,10 @@ def run():
     plot_structure_motion(S)
 
 
-def find_best_col(matr, seen_rows, unseen_cols):
+def find_best_col(matr, seen_cams, unseen_cols):
     covered_cols = Counter()
     for col in unseen_cols:
-        count = np.count_nonzero(~np.isnan(matr[seen_rows, col])) / 2
+        count = np.count_nonzero(~np.isnan(matr[seen_cams, col]))
         if count >= 2:  # TODO: Why is the count never more than 2?
             covered_cols[col] = count
     if len(covered_cols) > 0:
@@ -208,7 +220,7 @@ def find_best_cam(matr, seen_cols, unseen_cams):
     covered_cams = Counter()
     for cam in unseen_cams:
         count = np.count_nonzero(~np.isnan(matr[cam, seen_cols]))
-        if count >= 2:  # TODO: Why is the count never more than 2? According to description, 3 points should be visible
+        if count >= 3:  # TODO: Why is the count never more than 2? According to description, 3 points should be visible
             covered_cams[cam] = count
     if len(covered_cams) > 0:
         best_cam = covered_cams.most_common(1)[0][0]
